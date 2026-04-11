@@ -494,7 +494,16 @@ def book_room():
                     log.info(f"{'=' * 60}")
                     take_debug_screenshot(page, "booking_success.png")
                     context.close()
-                    return True
+                    return {
+                        "room": room,
+                        "start": s_skedda,
+                        "end": e_skedda,
+                        "start_mins": s_mins,
+                        "end_mins": e_mins,
+                        "duration_h": duration_h,
+                        "date": target_date,
+                        "room_priority": room_idx,
+                    }
 
                 if has_error:
                     try:
@@ -549,15 +558,27 @@ def book_room():
                     log.warning("  ⚠️ Ambiguous result — check screenshot")
                     take_debug_screenshot(page, "booking_ambiguous.png")
                     context.close()
-                    return True
+                    return {
+                        "room": room,
+                        "start": s_skedda,
+                        "end": e_skedda,
+                        "start_mins": s_mins,
+                        "end_mins": e_mins,
+                        "duration_h": duration_h,
+                        "date": target_date,
+                        "room_priority": room_idx,
+                        "ambiguous": True,
+                    }
 
         # Exhausted all rooms
         log.error("\n❌ Could not book any room — all slots taken or unavailable")
         take_debug_screenshot(page, "all_failed.png")
         context.close()
-        return False
+        return None
 
 
 if __name__ == "__main__":
-    success = book_room()
-    exit(0 if success else 1)
+    result = book_room()
+    if result:
+        print(f"\nResult: {result}")
+    exit(0 if result else 1)
