@@ -107,7 +107,7 @@ playwright install --with-deps chromium
 ### ⚙️ Configure Environment Variables
 
 Create a `.env` file:
-
+ 
 ```env
 NU_EMAIL=your_northeastern_email@northeastern.edu
 NU_PASSWORD=your_password_here
