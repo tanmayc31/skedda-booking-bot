@@ -57,25 +57,25 @@ This bot eliminates the need to manually race for rooms by automating the entire
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    Oracle Cloud VM (Ubuntu 22.04)             │
+│                 Oracle Cloud VM (Ubuntu 22.04)               │
 │                                                              │
-│  ┌─────────┐    ┌──────────────┐    ┌───────────────────┐   │
-│  │  Cron   │───►│ smart_book.py│───►│   book_room.py    │   │
-│  │ Schedule │    │ (Orchestrator)│    │ (Booking Engine)  │   │
-│  └─────────┘    └──────┬───────┘    └───────────────────┘   │
-│                        │                                     │
-│                        ▼                                     │
-│                 ┌──────────────┐    ┌───────────────────┐   │
-│                 │cancel_booking│    │  save_session.py  │   │
-│                 │    .py       │    │ (One-time Auth)   │   │
-│                 └──────────────┘    └───────────────────┘   │
-│                        │                                     │
-│                        ▼                                     │
-│                 ┌──────────────┐                             │
-│                 │   Skedda     │                             │
-│                 │  (Headless   │                             │
-│                 │  Chromium)   │                             │
-│                 └──────────────┘                             │
+│  ┌──────────┐    ┌───────────────┐    ┌───────────────────┐  │
+│  │  Cron    │───►│ smart_book.py │───►│   book_room.py    │  │
+│  │ Schedule │    │ (Orchestrator)│    │ (Booking Engine)  │  │
+│  └──────────┘    └──────┬────────┘    └───────────────────┘  │
+│                         │                                    │
+│                         ▼                                    │
+│                  ┌───────────────┐    ┌───────────────────┐  │
+│                  │cancel_booking │    │  save_session.py  │  │
+│                  │    .py        │    │ (One-time Auth)   │  │
+│                  └───────────────┘    └───────────────────┘  │
+│                         │                                    │
+│                         ▼                                    │
+│                  ┌───────────────┐                           │
+│                  │    Skedda     │                           │
+│                  │   (Headless   │                           │
+│                  │   Chromium)   │                           │
+│                  └───────────────┘                           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
