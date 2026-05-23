@@ -545,7 +545,7 @@ def book_room():
                         slot_idx += 1
                         continue
 
-                    elif "not allowed" in error_text.lower() or "advance-notice" in error_text.lower():
+                    elif "not allowed" in error_text.lower() or "advance-notice" in error_text.lower() or "hours of availability" in error_text.lower():
                         # Duration/rule/advance-notice error — skip to next room
                         log.info(f"  → Rule violation, skipping {room}")
                         break
