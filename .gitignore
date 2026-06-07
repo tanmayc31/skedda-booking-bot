@@ -1,7 +1,9 @@
 .env
 __pycache__/
 *.pyc
-.DS_Storedebug_*.py
+.DS_Store
+session_data/
+debug_*.py
 cancel_debug.html
 *.png
 current_booking.json
