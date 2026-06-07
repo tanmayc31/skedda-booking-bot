@@ -223,7 +223,7 @@ def book_room():
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
-            headless=True,  # flip to True once verified
+            headless=False,  # flip to True once verified
             args=["--start-maximized"],
         )
         page = context.new_page()
@@ -546,7 +546,7 @@ def book_room():
                         continue
 
                     elif "not allowed" in error_text.lower() or "advance-notice" in error_text.lower() or "hours of availability" in error_text.lower():
-                        # Duration/rule/advance-notice error — skip to next room
+                        # Duration/rule/advance-notice/closed room error — skip to next room
                         log.info(f"  → Rule violation, skipping {room}")
                         break
                     else:
