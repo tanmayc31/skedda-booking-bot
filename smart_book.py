@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
 from book_room import book_room, ROOM_PRIORITY, NNBSP, time_to_minutes, BOOKING_SCHEDULE
-from cancel_booking import cancel_bookings
+from cancel_booking import cancel_bookings, wait_for_booking_list
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
@@ -166,7 +166,7 @@ def check_existing_bookings_on_skedda():
 
         try:
             page.goto(list_url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(5000)
+            wait_for_booking_list(page)
 
             if "login" in page.url.lower():
                 log.error("Session expired — run save_session.py again")

@@ -33,6 +33,23 @@ def get_list_url(date_str):
     )
 
 
+def wait_for_booking_list(page, timeout_s=25):
+    """Wait until the list view's rows have rendered and stopped changing.
+
+    Skedda renders rows in batches, and a fixed sleep sometimes read the list
+    while it was still empty, so existing bookings were missed.
+    Returns the final row count (0 if nothing appeared in time).
+    """
+    last = -1
+    for _ in range(timeout_s):
+        page.wait_for_timeout(1000)
+        count = page.locator("div.tr-hover").count()
+        if count > 0 and count == last:
+            return count
+        last = count
+    return max(last, 0)
+
+
 def cancel_bookings(target_date=None, room_filter=None):
     """Cancel bookings for a given date. Optionally filter by room name.
     
@@ -64,7 +81,7 @@ def cancel_bookings(target_date=None, room_filter=None):
         log.info("Loading booking list...")
         try:
             page.goto(get_list_url(target_date), wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(5000)
+            wait_for_booking_list(page)
             if "login" in page.url.lower():
                 log.error("Session expired — run save_session.py again")
                 context.close()
@@ -111,7 +128,7 @@ def cancel_bookings(target_date=None, room_filter=None):
             # Reload to get fresh DOM (rows shift after each cancel)
             if i > 0:
                 page.goto(get_list_url(target_date), wait_until="domcontentloaded", timeout=30000)
-                page.wait_for_timeout(5000)
+                wait_for_booking_list(page)
 
             # Re-find your bookings
             rows = page.locator(f"div.tr-hover:has-text('{search_name}')").all()
