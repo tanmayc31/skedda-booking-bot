@@ -55,7 +55,7 @@ def cancel_bookings(target_date=None, room_filter=None):
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
-            headless=False,  # flip to True once verified
+            headless=True,
             args=["--start-maximized"],
         )
         page = context.new_page()

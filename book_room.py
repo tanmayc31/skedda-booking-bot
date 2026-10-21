@@ -32,12 +32,22 @@ ROOM_PRIORITY = [
     "CN-030C", "CN-030B", "CN-030A",
 ]
 
-# ── Booking constraints ──────────────────────────────────────────────────────
-EARLIEST_START = "3:00 PM"   # ideal start
-LATEST_END     = "9:00 PM"   # building closes
-MAX_DURATION_H = 4           # max allowed booking
-MIN_DURATION_H = 3           # minimum worth booking
+# ── Booking schedule ─────────────────────────────────────────────────────────
+# Weekday of the booking date (Mon=0 … Sun=6) → start times to try, in order.
+# Days not listed are skipped. Cron must run the day before, when the 24h
+# advance window opens for the first start time.
+BOOKING_SCHEDULE = {
+    0: ["2:30 PM"],               # Monday
+    1: ["10:00 AM", "10:30 AM"],  # Tuesday
+    3: ["4:00 PM"],               # Thursday
+}
+DURATION_H = 4               # daily limit at Cullinane Hall
 NNBSP = "\u202f"             # narrow no-break space (Skedda uses this)
+# Toggles are matched by their leading text. A plain "to" substring also
+# matches the date toggle in October ("Oc-to-ber"), so anchor to the start.
+START_TIME_TOGGLE = re.compile(r"^\s*From\s")
+END_TIME_TOGGLE   = re.compile(r"^\s*to\s")
+DATE_TOGGLE       = re.compile(r"\b20\d\d\b")
 
 
 # ── Time helpers ─────────────────────────────────────────────────────────────
@@ -58,30 +68,16 @@ def minutes_to_skedda(mins):
     return f"{display_h}:{m:02d}{NNBSP}{period}"
 
 
-def generate_time_slots():
-    """Generate (start, end) slots in priority order.
-    
-    Strategy:
-    1. Slide start from 3:00 PM forward in 15-min steps, keeping 4h duration
-       3:00-7:00, 3:15-7:15, ... 5:00-9:00
-    2. Once end hits 9:00 PM, shrink duration down to 3h minimum
-       5:15-9:00 (3h45m), 5:30-9:00 (3h30m), 5:45-9:00 (3h15m), 6:00-9:00 (3h)
+def generate_time_slots(weekday):
+    """Generate (start, end) slots in priority order for the booking date's weekday.
+
+    Each start time in BOOKING_SCHEDULE becomes one DURATION_H-long slot,
+    e.g. Tuesday → 10:00-2:00, 10:30-2:30. Returns [] if the day isn't scheduled.
     """
-    earliest = time_to_minutes(EARLIEST_START)  # 900
-    latest   = time_to_minutes(LATEST_END)      # 1260
-    max_dur  = MAX_DURATION_H * 60              # 240
-    min_dur  = MIN_DURATION_H * 60              # 180
-
-    slots = []
-    start = earliest
-    while start + min_dur <= latest:
-        end = min(start + max_dur, latest)
-        duration = end - start
-        if duration >= min_dur:
-            slots.append((start, end))
-        start += 15
-
-    return slots
+    return [
+        (time_to_minutes(s), time_to_minutes(s) + DURATION_H * 60)
+        for s in BOOKING_SCHEDULE.get(weekday, [])
+    ]
 
 
 def parse_conflict_time(error_text):
@@ -189,14 +185,14 @@ def set_time_slot(page, modal, start_mins, end_mins, current_start_text, current
     if new_start != current_start_text:
         if not set_time_dropdown(page, modal, current_start_text.replace(NNBSP, " ").split()[0], new_start):
             # Fallback: match on "From" or the current time text
-            modal.locator(".dropdown-toggle").filter(has_text="From").first.click()
+            modal.locator(".dropdown-toggle").filter(has_text=START_TIME_TOGGLE).first.click()
             page.wait_for_timeout(600)
             if not js_click_dropdown_item(page, new_start):
                 return None
 
     # Only change end if different
     if new_end != current_end_text:
-        if not set_time_dropdown(page, modal, "to", new_end):
+        if not set_time_dropdown(page, modal, END_TIME_TOGGLE, new_end):
             return None
 
     return (new_start, new_end)
@@ -210,11 +206,11 @@ def book_room():
     aria_label = tomorrow.strftime("%A, %B %-d, %Y")
     log.info(f"Starting smart booking for {target_date}")
 
-    all_slots = generate_time_slots()
+    all_slots = generate_time_slots(tomorrow.weekday())
 
     if not all_slots:
-        log.error("No valid time slots generated.")
-        return False
+        log.info(f"No booking scheduled for {tomorrow.strftime('%A')}, nothing to do.")
+        return None
 
     log.info(f"Generated {len(all_slots)} time slots")
     log.info(f"  First: {minutes_to_skedda(all_slots[0][0])}–{minutes_to_skedda(all_slots[0][1])}")
@@ -223,7 +219,7 @@ def book_room():
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir=SESSION_DIR,
-            headless=False,  # flip to True once verified
+            headless=True,
             args=["--start-maximized"],
         )
         page = context.new_page()
@@ -264,7 +260,7 @@ def book_room():
         # ── Step 3: Set date ──────────────────────────────────────────────
         log.info(f"Setting date to {target_date}...")
         try:
-            modal.locator(".dropdown-toggle").filter(has_text="2026").first.click()
+            modal.locator(".dropdown-toggle").filter(has_text=DATE_TOGGLE).first.click()
             page.wait_for_timeout(800)
             clicked = page.evaluate(
                 """(label) => {
@@ -284,19 +280,19 @@ def book_room():
             context.close()
             return False
 
-        # ── Step 4: Set initial time slot (first slot: 3 PM – 7 PM) ──────
+        # ── Step 4: Set initial time slot (first scheduled slot) ─────────
         first_start, first_end = all_slots[0]
         start_skedda = minutes_to_skedda(first_start)
         end_skedda = minutes_to_skedda(first_end)
 
         log.info(f"Setting initial time: {start_skedda} – {end_skedda}...")
         try:
-            modal.locator(".dropdown-toggle").filter(has_text="From").first.click()
+            modal.locator(".dropdown-toggle").filter(has_text=START_TIME_TOGGLE).first.click()
             page.wait_for_timeout(800)
             js_click_dropdown_item(page, start_skedda)
             page.wait_for_timeout(500)
 
-            modal.locator(".dropdown-toggle").filter(has_text="to").first.click()
+            modal.locator(".dropdown-toggle").filter(has_text=END_TIME_TOGGLE).first.click()
             page.wait_for_timeout(800)
             js_click_dropdown_item(page, end_skedda)
             page.wait_for_timeout(500)
@@ -453,14 +449,14 @@ def book_room():
                 if s_mins != current_start_mins or e_mins != current_end_mins:
                     # Update start time
                     if s_mins != current_start_mins:
-                        modal.locator(".dropdown-toggle").filter(has_text=current_start.split(NNBSP)[0]).first.click()
+                        modal.locator(".dropdown-toggle").filter(has_text=START_TIME_TOGGLE).first.click()
                         page.wait_for_timeout(600)
                         js_click_dropdown_item(page, s_skedda)
                         page.wait_for_timeout(300)
 
                     # Update end time
                     if e_mins != current_end_mins:
-                        modal.locator(".dropdown-toggle").filter(has_text="to").first.click()
+                        modal.locator(".dropdown-toggle").filter(has_text=END_TIME_TOGGLE).first.click()
                         page.wait_for_timeout(600)
                         js_click_dropdown_item(page, e_skedda)
                         page.wait_for_timeout(300)

@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
-from book_room import book_room, ROOM_PRIORITY, NNBSP, time_to_minutes
+from book_room import book_room, ROOM_PRIORITY, NNBSP, time_to_minutes, BOOKING_SCHEDULE
 from cancel_booking import cancel_bookings
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ def check_existing_bookings_on_skedda():
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir="session_data",
-            headless=False,
+            headless=True,
             args=["--start-maximized"],
         )
         page = context.new_page()
@@ -247,6 +247,12 @@ def smart_book():
     log.info(f"SMART BOOK — {now_str}")
     log.info(f"Target date: {tomorrow}")
     log.info(f"{'=' * 60}")
+
+    # Don't touch Skedda (or any manual bookings) on unscheduled days
+    tomorrow_weekday = (datetime.now() + timedelta(days=1)).weekday()
+    if tomorrow_weekday not in BOOKING_SCHEDULE:
+        log.info("No booking scheduled for tomorrow. Done.")
+        return True
 
     # ── Step 1: Check what's already booked ───────────────────────────
     current = check_existing_bookings_on_skedda()
